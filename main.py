@@ -9,8 +9,26 @@ CHAT_ID = os.getenv('CHAT_ID')
 DESCONTO = float(os.getenv('DESCONTO_MINIMO'))
 LIQ_MIN = int(os.getenv('LIQUIDEZ_MINIMA'))
 
-USD_BRL = 5.0  # depois vamos automatizar
+USD_BRL = 5.0  # depois automatizamos
 
+# 🔹 FUNÇÃO DA MENSAGEM (sempre no topo)
+def montar_mensagem(skin, buff_brl, desconto_percentual):
+    return f"""
+🚨 *OPORTUNIDADE DE ARBITRAGEM*
+
+🎮 *Skin:* {skin['nome']}
+📊 *Liquidez:* {skin['liquidez']}
+
+💰 *Buff163:* R$ {buff_brl:.2f}
+🏷️ *DashSkins:* R$ {skin['dash_brl']:.2f}
+📉 *Desconto:* -{desconto_percentual:.1f}%
+
+📦 *Marketplace:* DashSkins
+
+⏰ Atualizado agora
+"""
+
+# 🔹 SKINS DE TESTE
 skins = [
     {
         "nome": "AK-47 | Redline (FT)",
@@ -20,21 +38,17 @@ skins = [
     }
 ]
 
+# 🔹 LOOP PRINCIPAL
 for skin in skins:
     buff_brl = skin["buff_usd"] * USD_BRL
     desconto_percentual = ((buff_brl - skin["dash_brl"]) / buff_brl) * 100
 
     if desconto_percentual >= DESCONTO and skin["liquidez"] >= LIQ_MIN:
-        msg = (
-            f"🚨 ARBITRAGEM DETECTADA\n\n"
-            f"Skin: {skin['nome']}\n"
-            f"Buff: R$ {buff_brl:.2f}\n"
-            f"Dash: R$ {skin['dash_brl']:.2f}\n"
-            f"Desconto: {desconto_percentual:.1f}%\n"
-            f"Liquidez: {skin['liquidez']}"
-        )
-
-        requests.get(
+        requests.post(
             f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-            params={"chat_id": CHAT_ID, "text": msg}
+            json={
+                "chat_id": CHAT_ID,
+                "text": montar_mensagem(skin, buff_brl, desconto_percentual),
+                "parse_mode": "Markdown"
+            }
         )

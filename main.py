@@ -13,20 +13,31 @@ USD_BRL = 5.0  # depois automatizamos
 
 # 🔹 FUNÇÃO DA MENSAGEM (sempre no topo)
 def montar_mensagem(skin, buff_brl, desconto_percentual):
+    if desconto_percentual >= 30:
+        emoji = "🔥"
+    elif desconto_percentual >= 25:
+        emoji = "🟠"
+    else:
+        emoji = "🟡"
+
+    margem = buff_brl - skin["dash_brl"]
+
     return f"""
-🚨 *OPORTUNIDADE DE ARBITRAGEM*
+🚨 *OPORTUNIDADE DE ARBITRAGEM* {emoji}
 
 🎮 *Skin:* {skin['nome']}
 📊 *Liquidez:* {skin['liquidez']}
 
 💰 *Buff163:* R$ {buff_brl:.2f}
 🏷️ *DashSkins:* R$ {skin['dash_brl']:.2f}
-📉 *Desconto:* -{desconto_percentual:.1f}%
+📉 *Desconto:* {desconto_percentual:.1f}%
+💵 *Margem:* R$ {margem:.2f}
 
 📦 *Marketplace:* DashSkins
 
 ⏰ Atualizado agora
 """
+
 
 # 🔹 SKINS DE TESTE
 skins = [

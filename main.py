@@ -1,99 +1,74 @@
-import requests
 import os
+import time
+import requests
 from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
 
-load_dotenv('config.env')
+load_dotenv()
+
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+DESCONTO_MIN = float(os.getenv("DESCONTO_MINIMO", 20))
+LIQ_MIN = int(os.getenv("LIQUIDEZ_MINIMA", 60))
+
+print("BOT INICIADO")
+
+def enviar_telegram(msg):
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        json={
+            "chat_id": CHAT_ID,
+            "text": msg,
+            "parse_mode": "Markdown"
+        }
+    )
 
 def buscar_dashskins():
-    url = "https://api.dashskins.com.br/v1/market/items"
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json"
-    }
-
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-    except Exception as e:
-        print("❌ Erro ao acessar DashSkins:", e)
-        return []  # NÃO quebra o bot
-
     skins = []
 
-    for item in data.get("items", []):
-        try:
-            skins.append({
-                "nome": item["market_hash_name"],
-                "dash_brl": float(item["price"]),
-                "liquidez": int(item.get("liquidity", 0)),
-                "link": f"https://dashskins.com.br/item/{item['slug']}"
-            })
-        except:
-            continue  # ignora item quebrado
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        page.goto("https://dashskins.com.br", timeout=60000)
+        page.wait_for_timeout(8000)  # espera JS carregar
+
+        cards = page.query_selector_all("div[class*=item]")
+
+        for card in cards[:30]:
+            try:
+                nome = card.inner_text().split("\n")[0]
+                preco = card.inner_text().split("R$")[1].split("\n")[0]
+                preco = float(preco.replace(",", "."))
+                liquidez = 80  # placeholder (ajustamos depois)
+
+                skins.append({
+                    "nome": nome,
+                    "preco": preco,
+                    "liquidez": liquidez
+                })
+            except:
+                continue
+
+        browser.close()
 
     return skins
 
+while True:
+    skins = buscar_dashskins()
 
-TOKEN = os.getenv('TELEGRAM_TOKEN')
-CHAT_ID = os.getenv('CHAT_ID')
-DESCONTO = float(os.getenv('DESCONTO_MINIMO'))
-LIQ_MIN = int(os.getenv('LIQUIDEZ_MINIMA'))
+    for skin in skins:
+        buff_brl = skin["preco"] * 1.3
+        desconto = ((buff_brl - skin["preco"]) / buff_brl) * 100
 
-USD_BRL = 5.0  # depois automatizamos
-
-print("DEBUG CONFIG:")
-print("DESCONTO_MINIMO =", DESCONTO)
-print("LIQUIDEZ_MINIMA =", LIQ_MIN)
-print("TOKEN OK =", bool(TOKEN))
-print("CHAT_ID OK =", bool(CHAT_ID))
-
-# 🔹 FUNÇÃO DA MENSAGEM (sempre no topo)
-def montar_mensagem(skin, buff_brl, desconto_percentual):
-    if desconto_percentual >= 30:
-        emoji = "🔥"
-    elif desconto_percentual >= 25:
-        emoji = "🟠"
-    else:
-        emoji = "🟡"
-
-    margem = buff_brl - skin["dash_brl"]
-
-    return f"""
-🚨 *OPORTUNIDADE DE ARBITRAGEM* {emoji}
+        if desconto >= DESCONTO_MIN and skin["liquidez"] >= LIQ_MIN:
+            msg = f"""
+🚨 *OPORTUNIDADE*
 
 🎮 *Skin:* {skin['nome']}
-📊 *Liquidez:* {skin['liquidez']}
-
-💰 *Buff163:* R$ {buff_brl:.2f}
-🏷️ *DashSkins:* R$ {skin['dash_brl']:.2f}
-📉 *Desconto:* {desconto_percentual:.1f}%
-💵 *Margem:* R$ {margem:.2f}
-
-📦 *Marketplace:* DashSkins
-
-⏰ Atualizado agora
+💰 Dash: R$ {skin['preco']:.2f}
+📉 Desconto: {desconto:.1f}%
 """
+            enviar_telegram(msg)
 
-
-# 🔹 SKINS DE TESTE
-skins = buscar_dashskins()
-
-if not skins:
-    print("⚠️ Nenhuma skin retornada da DashSkins")
-
-# 🔹 LOOP PRINCIPAL
-for skin in skins:
-    buff_brl = skin["dash_brl"] * 1.30  # simula Buff 30% mais caro
-    desconto_percentual = ((buff_brl - skin["dash_brl"]) / buff_brl) * 100
-
-    if desconto_percentual >= DESCONTO and skin["liquidez"] >= LIQ_MIN:
-        requests.post(
-            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-            json={
-                "chat_id": CHAT_ID,
-                "text": montar_mensagem(skin, buff_brl, desconto_percentual),
-                "parse_mode": "Markdown"
-            }
-        )
+    time.sleep(300)

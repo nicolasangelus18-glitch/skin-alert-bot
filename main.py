@@ -1,68 +1,79 @@
 from playwright.sync_api import sync_playwright
 import time
 
-print("🚀 Iniciando bot DashSkins (modo teste de scraping)...")
-
 URL = "https://dashskins.com.br"
 
-def buscar_dashskins():
-    skins = []
+print("🚀 Teste Cloudflare + DashSkins (Railway)")
 
+def run_once():
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=["--disable-blink-features=AutomationControlled"]
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
 
-        page = browser.new_page()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="pt-BR",
+            timezone_id="America/Sao_Paulo",
+            viewport={"width": 1366, "height": 768},
+        )
 
-        print("🌐 Abrindo DashSkins...")
-        page.goto(URL, timeout=60000)
+        page = context.new_page()
 
-        # Cloudflare costuma mostrar "Just a moment..."
-        print("⏳ Aguardando Cloudflare...")
-        time.sleep(8)
+        # Remove webdriver flag (ajuda em alguns sites)
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+        """)
 
-        print("🔍 Aguardando cards de skins aparecerem...")
-        page.wait_for_selector("div[class*=item]", timeout=60000)
+        print("🌐 Abrindo site...")
+        page.goto(URL, timeout=60000, wait_until="domcontentloaded")
 
-        cards = page.query_selector_all("div[class*=item]")
+        # Espera Cloudflare “soltar” (até 90s)
+        print("⏳ Esperando challenge do Cloudflare (até 90s)...")
+        t0 = time.time()
+        while time.time() - t0 < 90:
+            title = page.title()
+            if "Just a moment" not in title and "Attention Required" not in title:
+                break
+            time.sleep(2)
 
-        print(f"📦 {len(cards)} cards encontrados")
+        title = page.title()
+        print("📄 Título agora:", title)
+        print("🔗 URL agora:", page.url)
 
-        for card in cards[:20]:
+        # Tenta achar cards (pode variar)
+        selectors = [
+            "div[class*=item]",
+            "[class*=item]",
+            "[data-testid*=item]",
+            "a[href*='item']",
+        ]
+
+        found = False
+        for sel in selectors:
             try:
-                texto = card.inner_text()
+                page.wait_for_selector(sel, timeout=15000)
+                elements = page.query_selector_all(sel)
+                print(f"✅ Seletor OK: {sel} | elementos: {len(elements)}")
+                found = True
+                break
+            except:
+                print(f"⚠️ Não achei: {sel}")
 
-                linhas = texto.split("\n")
-
-                nome = linhas[0]
-
-                preco_linha = next(l for l in linhas if "R$" in l)
-                preco = float(
-                    preco_linha
-                    .replace("R$", "")
-                    .replace(".", "")
-                    .replace(",", ".")
-                    .strip()
-                )
-
-                skins.append({
-                    "nome": nome,
-                    "preco": preco
-                })
-
-                print(f"✅ {nome} — R$ {preco:.2f}")
-
-            except Exception as e:
-                print("⚠️ Erro ao ler card:", e)
-                continue
+        if not found:
+            # Debug: mostra um pedaço do HTML pra confirmar que ficou no challenge
+            html = page.content()
+            print("🧾 HTML (primeiros 800 chars):")
+            print(html[:800])
 
         browser.close()
 
-    return skins
-
-
-skins = buscar_dashskins()
-
-print(f"\n🏁 Fim do teste. Total de skins capturadas: {len(skins)}")
+# Roda 2 tentativas
+for i in range(2):
+    print(f"\n===== TENTATIVA {i+1}/2 =====")
+    run_once()

@@ -7,8 +7,13 @@ load_dotenv('config.env')
 def buscar_dashskins():
     url = "https://api.dashskins.com.br/v1/market/items"
 
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
+    }
+
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
     except Exception as e:
@@ -29,6 +34,7 @@ def buscar_dashskins():
             continue  # ignora item quebrado
 
     return skins
+
 
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')

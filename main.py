@@ -4,6 +4,23 @@ from dotenv import load_dotenv
 
 load_dotenv('config.env')
 
+def buscar_dashskins():
+    url = "https://api.dashskins.com.br/v1/market/items"
+    response = requests.get(url, timeout=10)
+    data = response.json()
+
+    skins = []
+
+    for item in data["items"]:
+        skins.append({
+            "nome": item["market_hash_name"],
+            "dash_brl": float(item["price"]),
+            "liquidez": int(item.get("liquidity", 0)),
+            "link": f"https://dashskins.com.br/item/{item['slug']}"
+        })
+
+    return skins
+
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 DESCONTO = float(os.getenv('DESCONTO_MINIMO'))
@@ -40,18 +57,13 @@ def montar_mensagem(skin, buff_brl, desconto_percentual):
 
 
 # 🔹 SKINS DE TESTE
-skins = [
-    {
-        "nome": "AK-47 | Redline (FT)",
-        "buff_usd": 100,
-        "liquidez": 80,
-        "dash_brl": 380
-    }
-]
+skins = buscar_dashskins()
+
+
 
 # 🔹 LOOP PRINCIPAL
 for skin in skins:
-    buff_brl = skin["buff_usd"] * USD_BRL
+    buff_brl = skin["dash_brl"] * 1.30  # simula Buff 30% mais caro
     desconto_percentual = ((buff_brl - skin["dash_brl"]) / buff_brl) * 100
 
     if desconto_percentual >= DESCONTO and skin["liquidez"] >= LIQ_MIN:

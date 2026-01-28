@@ -37,6 +37,12 @@ LIQ_MIN = int(os.getenv('LIQUIDEZ_MINIMA'))
 
 USD_BRL = 5.0  # depois automatizamos
 
+print("DEBUG CONFIG:")
+print("DESCONTO_MINIMO =", DESCONTO)
+print("LIQUIDEZ_MINIMA =", LIQ_MIN)
+print("TOKEN OK =", bool(TOKEN))
+print("CHAT_ID OK =", bool(CHAT_ID))
+
 # 🔹 FUNÇÃO DA MENSAGEM (sempre no topo)
 def montar_mensagem(skin, buff_brl, desconto_percentual):
     if desconto_percentual >= 30:

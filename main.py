@@ -6,18 +6,27 @@ load_dotenv('config.env')
 
 def buscar_dashskins():
     url = "https://api.dashskins.com.br/v1/market/items"
-    response = requests.get(url, timeout=10)
-    data = response.json()
+
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print("❌ Erro ao acessar DashSkins:", e)
+        return []  # NÃO quebra o bot
 
     skins = []
 
-    for item in data["items"]:
-        skins.append({
-            "nome": item["market_hash_name"],
-            "dash_brl": float(item["price"]),
-            "liquidez": int(item.get("liquidity", 0)),
-            "link": f"https://dashskins.com.br/item/{item['slug']}"
-        })
+    for item in data.get("items", []):
+        try:
+            skins.append({
+                "nome": item["market_hash_name"],
+                "dash_brl": float(item["price"]),
+                "liquidez": int(item.get("liquidity", 0)),
+                "link": f"https://dashskins.com.br/item/{item['slug']}"
+            })
+        except:
+            continue  # ignora item quebrado
 
     return skins
 
@@ -59,7 +68,8 @@ def montar_mensagem(skin, buff_brl, desconto_percentual):
 # 🔹 SKINS DE TESTE
 skins = buscar_dashskins()
 
-
+if not skins:
+    print("⚠️ Nenhuma skin retornada da DashSkins")
 
 # 🔹 LOOP PRINCIPAL
 for skin in skins:
